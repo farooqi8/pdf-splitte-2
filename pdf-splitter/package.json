@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
-    "@next/swc-win32-x64-msvc": "14.2.25",
     "@react-pdf/renderer": "^4.5.1",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.0",
