@@ -7,7 +7,113 @@ import { promises as fs } from 'node:fs'
 
 type ExtractorOutput = { ok: true; text: string } | { ok: false; error: string }
 
+// #region agent log
+function agentLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
+  fetch('http://127.0.0.1:7346/ingest/95f67409-f74a-42d6-93d4-9f4b4593246b', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '3e99f0' },
+    body: JSON.stringify({
+      sessionId: '3e99f0',
+      runId: process.env.AGENT_RUN_ID ?? 'pre-fix',
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {})
+}
+// #endregion
+
+async function extractPdfTextDirect(buffer: Buffer): Promise<string> {
+  // #region agent log
+  agentLog('A', 'lib/pdf/reader.ts:39', 'extractPdfTextDirect start', {
+    node: process.version,
+    cwd: process.cwd(),
+    bufferBytes: buffer.byteLength,
+  })
+  // #endregion
+
+  // Importing here ensures Next/Vercel bundles pdfjs-dist into the server function.
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+
+  // Even with disableWorker=true, PDF.js can still require workerSrc in some environments.
+  // We point it at the bundled worker file.
+  const { createRequire } = await import('node:module')
+  const { pathToFileURL } = await import('node:url')
+  const require = createRequire(import.meta.url)
+  const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
+  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString()
+
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+  })
+
+  const doc = await loadingTask.promise
+  try {
+    const outLines: string[] = []
+    for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+      const page = await doc.getPage(pageNum)
+      const content = await page.getTextContent()
+      const positioned = content.items
+        .map((it) => {
+          const tr = Array.isArray((it as { transform?: unknown }).transform)
+            ? ((it as { transform: number[] }).transform)
+            : null
+          const x = tr ? tr[4] : 0
+          const y = tr ? tr[5] : 0
+          const str = String((it as { str?: unknown }).str ?? '').trim()
+          return { str, x, y }
+        })
+        .filter((p) => p.str.length > 0)
+
+      // Same heuristic as scripts/pdf-extract.mjs
+      const sorted = [...positioned].sort((a, b) => b.y - a.y || a.x - b.x)
+      const lines: Array<{ y: number; parts: typeof positioned }> = []
+      const yTol = 2.5
+      for (const it of sorted) {
+        const last = lines[lines.length - 1]
+        if (!last || Math.abs(last.y - it.y) > yTol) {
+          lines.push({ y: it.y, parts: [it] })
+        } else {
+          last.parts.push(it)
+        }
+      }
+      outLines.push(
+        ...lines.map((ln) =>
+          ln.parts
+            .sort((a, b) => a.x - b.x)
+            .map((p) => p.str)
+            .join(' '),
+        ),
+      )
+      outLines.push(`-- ${pageNum} of ${doc.numPages} --`)
+    }
+
+    // #region agent log
+    agentLog('A', 'lib/pdf/reader.ts:105', 'extractPdfTextDirect success', {
+      pages: doc.numPages,
+      lines: outLines.length,
+    })
+    // #endregion
+
+    return outLines.join('\n')
+  } finally {
+    await doc.destroy()
+  }
+}
+
 async function extractPdfText(buffer: Buffer): Promise<string> {
+  try {
+    return await extractPdfTextDirect(buffer)
+  } catch (e) {
+    // #region agent log
+    agentLog('A', 'lib/pdf/reader.ts:122', 'extractPdfTextDirect failed; will fallback to child process', {
+      error: e instanceof Error ? e.message : String(e),
+    })
+    // #endregion
+  }
+
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'pdf-splitter-'))
   const pdfPath = path.join(tmpDir, 'input.pdf')
   const scriptPath = path.join(process.cwd(), 'scripts', 'pdf-extract.mjs')
@@ -15,6 +121,18 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
   await fs.writeFile(pdfPath, buffer)
 
   try {
+    // #region agent log
+    agentLog('B', 'lib/pdf/reader.ts:137', 'extractPdfText child-process start', {
+      node: process.version,
+      cwd: process.cwd(),
+      scriptPath,
+      scriptExists: await fs
+        .access(scriptPath)
+        .then(() => true)
+        .catch(() => false),
+    })
+    // #endregion
+
     const out = await new Promise<string>((resolve, reject) => {
       const child = spawn(process.execPath, [scriptPath, pdfPath], {
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -39,6 +157,11 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
     if (!parsed.ok) {
       throw new Error(parsed.error || 'PDF extraction failed')
     }
+
+    // #region agent log
+    agentLog('B', 'lib/pdf/reader.ts:175', 'extractPdfText child-process success', { textBytes: parsed.text.length })
+    // #endregion
+
     return parsed.text
   } finally {
     // best-effort cleanup
