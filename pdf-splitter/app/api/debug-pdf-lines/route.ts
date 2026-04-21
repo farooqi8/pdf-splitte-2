@@ -26,8 +26,20 @@ export async function POST(req: Request) {
     })
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Failed to read PDF.'
+    const stack = e instanceof Error ? e.stack ?? null : null
+    const name = e instanceof Error ? e.name : 'UnknownError'
     return NextResponse.json(
-      { success: false, message },
+      {
+        success: false,
+        message,
+        debug: {
+          name,
+          stack,
+          node: process.version,
+          vercel: Boolean(process.env.VERCEL),
+          cwd: process.cwd(),
+        },
+      },
       { status: 500 },
     )
   }
