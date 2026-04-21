@@ -28,8 +28,9 @@ type DebugResponse =
       lines: string[]
       parsedPreview: ParsedRow[]
       rawTotals: RawTotals
+      debug?: unknown
     }
-  | { success: false; message: string }
+  | { success: false; message: string; debug?: unknown }
 
 type ProcessResponse =
   | { success: true; jobId: string }
@@ -206,7 +207,13 @@ export default function ProcessPage() {
               </div>
             ) : (
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">
-                {preview.message}
+                <div className="font-semibold">Preview failed</div>
+                <div className="mt-1">{preview.message}</div>
+                {'debug' in preview && preview.debug ? (
+                  <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-red-200 bg-white/60 p-2 text-xs text-red-950">
+                    {JSON.stringify(preview.debug, null, 2)}
+                  </pre>
+                ) : null}
               </div>
             )
           ) : (
