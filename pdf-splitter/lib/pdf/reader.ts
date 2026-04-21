@@ -84,22 +84,25 @@ async function extractPdfTextDirect(buffer: Buffer): Promise<string> {
     stage = 'pdfjs_import'
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 
-    // Even with disableWorker=true, PDF.js can still require workerSrc in some environments.
-    // We point it at the bundled worker file.
-    stage = 'worker_setup'
-    const { createRequire } = await import('node:module')
-    const { pathToFileURL } = await import('node:url')
-    const require = createRequire(path.join(process.cwd(), 'package.json'))
-    const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
-    pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString()
-
     stage = 'getDocument'
-    const loadingTask = pdfjs.getDocument({
+    // In Vercel/serverless, worker path resolution can break. Disable worker entirely.
+    const getDocument = (pdfjs as unknown as {
+      getDocument: (src: { data: Uint8Array; disableWorker?: boolean }) => { promise: Promise<unknown> }
+    }).getDocument
+    const loadingTask = getDocument({
       data: new Uint8Array(buffer),
+      disableWorker: true,
     })
 
     stage = 'await_document'
-    const doc = await loadingTask.promise
+    type PdfJsTextItem = { str?: unknown; transform?: unknown }
+    type PdfJsTextContent = { items: PdfJsTextItem[] }
+    type PdfJsPage = { getTextContent: () => Promise<PdfJsTextContent> }
+    const doc = (await loadingTask.promise) as {
+      numPages: number
+      getPage: (n: number) => Promise<PdfJsPage>
+      destroy: () => Promise<void>
+    }
     try {
       const outLines: string[] = []
       for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
