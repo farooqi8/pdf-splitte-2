@@ -1,0 +1,10 @@
+# Ignore everything in Downloads by default
+*
+
+# Keep this ignore file
+!.gitignore
+
+# Track ONLY the pdf-splitter project folder
+!pdf-splitter/
+!pdf-splitter/**
+

@@ -1,0 +1,42 @@
+{
+  "name": "pdf-splitter",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "node --test tests/excel-reader.test.cjs"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.2.2",
+    "@next/swc-win32-x64-msvc": "14.2.25",
+    "@react-pdf/renderer": "^4.5.1",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.104.0",
+    "@tanstack/react-query": "^5.99.2",
+    "next": "14.2.25",
+    "pdf-parse": "^2.4.5",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-hook-form": "^7.72.1",
+    "xlsx": "^0.18.5",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.12"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.25",
+    "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5",
+    "vitest": "^4.1.4"
+  }
+}

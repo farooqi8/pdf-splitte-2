@@ -1,0 +1,35 @@
+import { NextResponse } from 'next/server'
+import { readPdf } from '@/lib/pdf/reader'
+
+export const runtime = 'nodejs'
+
+export async function POST(req: Request) {
+  try {
+    const form = await req.formData()
+    const file = form.get('file')
+    if (!(file instanceof File)) {
+      return NextResponse.json(
+        { success: false, message: 'PDF file is required.' },
+        { status: 400 },
+      )
+    }
+
+    const ab = await file.arrayBuffer()
+    const buffer = Buffer.from(ab)
+    const { debugLines, rawTotals, rows } = await readPdf(buffer)
+
+    return NextResponse.json({
+      success: true,
+      lines: debugLines,
+      parsedPreview: rows.slice(0, 5),
+      rawTotals,
+    })
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'Failed to read PDF.'
+    return NextResponse.json(
+      { success: false, message },
+      { status: 500 },
+    )
+  }
+}
+
