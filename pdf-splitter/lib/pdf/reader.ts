@@ -29,6 +29,19 @@ async function extractPdfTextDirect(buffer: Buffer): Promise<string> {
   })
   // #endregion
 
+  // #region agent log
+  agentLog('C', 'lib/pdf/reader.ts:47', 'polyfill check', {
+    hasDOMMatrix: typeof (globalThis as { DOMMatrix?: unknown }).DOMMatrix !== 'undefined',
+  })
+  // #endregion
+
+  // pdfjs-dist expects DOMMatrix in some Node runtimes (e.g. Vercel).
+  // Polyfill it only when missing.
+  if (typeof (globalThis as { DOMMatrix?: unknown }).DOMMatrix === 'undefined') {
+    const dom = await import('@thednp/dommatrix')
+    ;(globalThis as { DOMMatrix?: unknown }).DOMMatrix = dom.default
+  }
+
   // Importing here ensures Next/Vercel bundles pdfjs-dist into the server function.
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 

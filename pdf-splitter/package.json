@@ -15,6 +15,7 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.0",
     "@tanstack/react-query": "^5.99.2",
+    "@thednp/dommatrix": "^2.0.12",
     "next": "14.2.25",
     "pdfjs-dist": "^5.4.296",
     "react": "18.3.1",
