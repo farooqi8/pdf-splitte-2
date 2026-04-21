@@ -21,6 +21,7 @@ function agentLog(hypothesisId: string, location: string, message: string, data:
 // #endregion
 
 async function extractPdfTextDirect(buffer: Buffer): Promise<string> {
+  let stage = 'start'
   // #region agent log
   agentLog('A', 'lib/pdf/reader.ts:39', 'extractPdfTextDirect start', {
     node: process.version,
@@ -29,101 +30,134 @@ async function extractPdfTextDirect(buffer: Buffer): Promise<string> {
   })
   // #endregion
 
-  // #region agent log
-  agentLog('C', 'lib/pdf/reader.ts:47', 'polyfill check', {
-    hasDOMMatrix: typeof (globalThis as { DOMMatrix?: unknown }).DOMMatrix !== 'undefined',
-  })
-  // #endregion
-
-  // pdfjs-dist expects DOMMatrix in some Node runtimes (e.g. Vercel).
-  // Polyfill it only when missing.
-  if (typeof (globalThis as { DOMMatrix?: unknown }).DOMMatrix === 'undefined') {
-    const dom = await import('@thednp/dommatrix')
-    ;(globalThis as { DOMMatrix?: unknown }).DOMMatrix = dom.default
-  }
-
-  // pdfjs-dist uses DOMMatrix static helpers in some builds.
-  // Add shims if the polyfill doesn't provide them.
-  {
-    const DM = (globalThis as { DOMMatrix?: unknown }).DOMMatrix as unknown as {
-      new (init?: unknown): unknown
-      fromFloat32Array?: (a: Float32Array) => unknown
-      fromFloat64Array?: (a: Float64Array) => unknown
-    }
-    if (DM && typeof DM.fromFloat32Array !== 'function') {
-      DM.fromFloat32Array = (a: Float32Array) => new DM(a)
-    }
-    if (DM && typeof DM.fromFloat64Array !== 'function') {
-      DM.fromFloat64Array = (a: Float64Array) => new DM(a)
-    }
-  }
-
-  // Importing here ensures Next/Vercel bundles pdfjs-dist into the server function.
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-
-  // Even with disableWorker=true, PDF.js can still require workerSrc in some environments.
-  // We point it at the bundled worker file.
-  const { createRequire } = await import('node:module')
-  const { pathToFileURL } = await import('node:url')
-  const require = createRequire(path.join(process.cwd(), 'package.json'))
-  const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
-  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString()
-
-  const loadingTask = pdfjs.getDocument({
-    data: new Uint8Array(buffer),
-  })
-
-  const doc = await loadingTask.promise
   try {
-    const outLines: string[] = []
-    for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
-      const page = await doc.getPage(pageNum)
-      const content = await page.getTextContent()
-      const positioned = content.items
-        .map((it) => {
-          const tr = Array.isArray((it as { transform?: unknown }).transform)
-            ? ((it as { transform: number[] }).transform)
-            : null
-          const x = tr ? tr[4] : 0
-          const y = tr ? tr[5] : 0
-          const str = String((it as { str?: unknown }).str ?? '').trim()
-          return { str, x, y }
-        })
-        .filter((p) => p.str.length > 0)
-
-      // Same heuristic as scripts/pdf-extract.mjs
-      const sorted = [...positioned].sort((a, b) => b.y - a.y || a.x - b.x)
-      const lines: Array<{ y: number; parts: typeof positioned }> = []
-      const yTol = 2.5
-      for (const it of sorted) {
-        const last = lines[lines.length - 1]
-        if (!last || Math.abs(last.y - it.y) > yTol) {
-          lines.push({ y: it.y, parts: [it] })
-        } else {
-          last.parts.push(it)
-        }
-      }
-      outLines.push(
-        ...lines.map((ln) =>
-          ln.parts
-            .sort((a, b) => a.x - b.x)
-            .map((p) => p.str)
-            .join(' '),
-        ),
-      )
-      outLines.push(`-- ${pageNum} of ${doc.numPages} --`)
-    }
-
+    stage = 'polyfill_check'
     // #region agent log
-    agentLog('A', 'lib/pdf/reader.ts:105', 'extractPdfTextDirect success', {
-      pages: doc.numPages,
-      lines: outLines.length,
+    agentLog('C', 'lib/pdf/reader.ts:47', 'polyfill check', {
+      hasDOMMatrix: typeof (globalThis as { DOMMatrix?: unknown }).DOMMatrix !== 'undefined',
     })
     // #endregion
 
-    return outLines.join('\n')
-  } finally {
-    await doc.destroy()
+    // pdfjs-dist expects DOMMatrix in some Node runtimes (e.g. Vercel).
+    // Polyfill it only when missing.
+    stage = 'polyfill_load'
+    if (typeof (globalThis as { DOMMatrix?: unknown }).DOMMatrix === 'undefined') {
+      const dom = await import('@thednp/dommatrix')
+      ;(globalThis as { DOMMatrix?: unknown }).DOMMatrix = dom.default
+    }
+
+    // pdfjs-dist uses DOMMatrix static helpers in some builds.
+    // Add shims if the polyfill doesn't provide them.
+    stage = 'polyfill_shim'
+    {
+      const DM = (globalThis as { DOMMatrix?: unknown }).DOMMatrix as unknown as {
+        new (init?: unknown): unknown
+        fromFloat32Array?: (a: Float32Array) => unknown
+        fromFloat64Array?: (a: Float64Array) => unknown
+        fromMatrix?: (m: unknown) => unknown
+        fromPoint?: (p: unknown) => unknown
+      }
+      if (DM && typeof DM.fromFloat32Array !== 'function') {
+        DM.fromFloat32Array = (a: Float32Array) => new DM(a)
+      }
+      if (DM && typeof DM.fromFloat64Array !== 'function') {
+        DM.fromFloat64Array = (a: Float64Array) => new DM(a)
+      }
+      if (DM && typeof DM.fromMatrix !== 'function') {
+        DM.fromMatrix = (m: unknown) => new DM(m)
+      }
+      if (DM && typeof DM.fromPoint !== 'function') {
+        DM.fromPoint = (p: unknown) => p
+      }
+
+      // #region agent log
+      agentLog('C', 'lib/pdf/reader.ts:88', 'polyfill shim status', {
+        has_fromFloat32Array: typeof DM?.fromFloat32Array === 'function',
+        has_fromFloat64Array: typeof DM?.fromFloat64Array === 'function',
+        has_fromMatrix: typeof DM?.fromMatrix === 'function',
+        has_fromPoint: typeof DM?.fromPoint === 'function',
+      })
+      // #endregion
+    }
+
+    // Importing here ensures Next/Vercel bundles pdfjs-dist into the server function.
+    stage = 'pdfjs_import'
+    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+
+    // Even with disableWorker=true, PDF.js can still require workerSrc in some environments.
+    // We point it at the bundled worker file.
+    stage = 'worker_setup'
+    const { createRequire } = await import('node:module')
+    const { pathToFileURL } = await import('node:url')
+    const require = createRequire(path.join(process.cwd(), 'package.json'))
+    const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
+    pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString()
+
+    stage = 'getDocument'
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(buffer),
+    })
+
+    stage = 'await_document'
+    const doc = await loadingTask.promise
+    try {
+      const outLines: string[] = []
+      for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+        stage = `page_${pageNum}_getPage`
+        const page = await doc.getPage(pageNum)
+        stage = `page_${pageNum}_getTextContent`
+        const content = await page.getTextContent()
+        stage = `page_${pageNum}_items`
+        const positioned = content.items
+          .map((it) => {
+            const tr = Array.isArray((it as { transform?: unknown }).transform)
+              ? ((it as { transform: number[] }).transform)
+              : null
+            const x = tr ? tr[4] : 0
+            const y = tr ? tr[5] : 0
+            const str = String((it as { str?: unknown }).str ?? '').trim()
+            return { str, x, y }
+          })
+          .filter((p) => p.str.length > 0)
+
+        // Same heuristic as scripts/pdf-extract.mjs
+        stage = `page_${pageNum}_groupLines`
+        const sorted = [...positioned].sort((a, b) => b.y - a.y || a.x - b.x)
+        const lines: Array<{ y: number; parts: typeof positioned }> = []
+        const yTol = 2.5
+        for (const it of sorted) {
+          const last = lines[lines.length - 1]
+          if (!last || Math.abs(last.y - it.y) > yTol) {
+            lines.push({ y: it.y, parts: [it] })
+          } else {
+            last.parts.push(it)
+          }
+        }
+        outLines.push(
+          ...lines.map((ln) =>
+            ln.parts
+              .sort((a, b) => a.x - b.x)
+              .map((p) => p.str)
+              .join(' '),
+          ),
+        )
+        outLines.push(`-- ${pageNum} of ${doc.numPages} --`)
+      }
+
+      // #region agent log
+      agentLog('A', 'lib/pdf/reader.ts:105', 'extractPdfTextDirect success', {
+        pages: doc.numPages,
+        lines: outLines.length,
+      })
+      // #endregion
+
+      return outLines.join('\n')
+    } finally {
+      await doc.destroy()
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`PDFJS_STAGE=${stage}; ${msg}`)
   }
 }
 
