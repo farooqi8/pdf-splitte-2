@@ -23,6 +23,14 @@ export async function POST(req: Request) {
       lines: debugLines,
       parsedPreview: rows.slice(0, 5),
       rawTotals,
+      debug: {
+        node: process.version,
+        vercel: Boolean(process.env.VERCEL),
+        git: {
+          commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+          repo: process.env.VERCEL_GIT_REPO_SLUG ?? null,
+        },
+      },
     })
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Failed to read PDF.'
@@ -38,6 +46,10 @@ export async function POST(req: Request) {
           node: process.version,
           vercel: Boolean(process.env.VERCEL),
           cwd: process.cwd(),
+          git: {
+            commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+            repo: process.env.VERCEL_GIT_REPO_SLUG ?? null,
+          },
         },
       },
       { status: 500 },
