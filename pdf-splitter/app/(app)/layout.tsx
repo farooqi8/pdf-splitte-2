@@ -1,7 +1,15 @@
 import type { ReactNode } from 'react'
 import Link from 'next/link'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { AUTH_COOKIE_NAME } from '@/lib/auth/session'
 
 export default function AppLayout({ children }: { children: ReactNode }) {
+  const authed = cookies().get(AUTH_COOKIE_NAME)?.value === '1'
+  if (!authed) {
+    redirect('/login')
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
       <header className="border-b bg-white">
