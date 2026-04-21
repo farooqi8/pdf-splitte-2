@@ -42,6 +42,22 @@ async function extractPdfTextDirect(buffer: Buffer): Promise<string> {
     ;(globalThis as { DOMMatrix?: unknown }).DOMMatrix = dom.default
   }
 
+  // pdfjs-dist uses DOMMatrix static helpers in some builds.
+  // Add shims if the polyfill doesn't provide them.
+  {
+    const DM = (globalThis as { DOMMatrix?: unknown }).DOMMatrix as unknown as {
+      new (init?: unknown): unknown
+      fromFloat32Array?: (a: Float32Array) => unknown
+      fromFloat64Array?: (a: Float64Array) => unknown
+    }
+    if (DM && typeof DM.fromFloat32Array !== 'function') {
+      DM.fromFloat32Array = (a: Float32Array) => new DM(a)
+    }
+    if (DM && typeof DM.fromFloat64Array !== 'function') {
+      DM.fromFloat64Array = (a: Float64Array) => new DM(a)
+    }
+  }
+
   // Importing here ensures Next/Vercel bundles pdfjs-dist into the server function.
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 
