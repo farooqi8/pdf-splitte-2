@@ -63,18 +63,30 @@ export async function GET(
       )
     }
 
-    const { data: signed, error: signError } = await supabase.storage
+    const { data: fileData, error: downloadError } = await supabase.storage
       .from('jobs')
-      .createSignedUrl(objectPath, 60 * 10)
+      .download(objectPath)
 
-    if (signError || !signed?.signedUrl) {
+    if (downloadError || !fileData) {
       return NextResponse.json(
-        { success: false, message: 'Failed to create download link.' },
+        { success: false, message: 'Failed to download PDF from storage.' },
         { status: 500 },
       )
     }
 
-    return NextResponse.redirect(signed.signedUrl)
+    const arrayBuffer = await fileData.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
+    const safeName = `${type}.pdf`
+
+    return new NextResponse(buffer, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${safeName}"`,
+        'Cache-Control': 'private, no-store',
+      },
+    })
   } catch {
     return NextResponse.json(
       { success: false, message: 'Failed to download PDF.' },
