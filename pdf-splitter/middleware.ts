@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { AUTH_COOKIE_NAME } from '@/lib/auth/session'
+
+// Edge runtime safe: keep middleware dependency-free (no path aliases).
+const AUTH_COOKIE_NAME = 'ps_auth' as const
 
 function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith('/_next')) return true
