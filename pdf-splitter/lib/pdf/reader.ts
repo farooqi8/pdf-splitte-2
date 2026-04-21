@@ -85,7 +85,34 @@ async function extractPdfTextDirect(buffer: Buffer): Promise<string> {
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 
     stage = 'getDocument'
-    // In Vercel/serverless, worker path resolution can break. Disable worker entirely.
+    // In Vercel/serverless, worker resolution can break unless we explicitly bundle it.
+    stage = 'worker_setup'
+    try {
+      const { createRequire } = await import('node:module')
+      const { pathToFileURL } = await import('node:url')
+
+      // Force worker to be included in the server bundle.
+      await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
+
+      const requireA = createRequire(import.meta.url)
+      const workerPath = requireA.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
+      pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString()
+
+      // #region agent log
+      agentLog('D', 'lib/pdf/reader.ts:95', 'workerSrc set', {
+        workerPath,
+        workerSrcPrefix: String(pdfjs.GlobalWorkerOptions.workerSrc).slice(0, 20),
+      })
+      // #endregion
+    } catch (e) {
+      // #region agent log
+      agentLog('D', 'lib/pdf/reader.ts:106', 'worker_setup failed', {
+        error: e instanceof Error ? e.message : String(e),
+      })
+      // #endregion
+      // Continue; disableWorker may still succeed.
+    }
+
     const getDocument = (pdfjs as unknown as {
       getDocument: (src: { data: Uint8Array; disableWorker?: boolean }) => { promise: Promise<unknown> }
     }).getDocument
