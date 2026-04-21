@@ -1,11 +1,6 @@
 import type { ParsedRow, RawTotals } from '@/types'
 import { normalisePermit } from '@/lib/matching/normalise'
-import { spawn } from 'node:child_process'
 import path from 'node:path'
-import os from 'node:os'
-import { promises as fs } from 'node:fs'
-
-type ExtractorOutput = { ok: true; text: string } | { ok: false; error: string }
 
 // #region agent log
 function agentLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
@@ -108,71 +103,12 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
     return await extractPdfTextDirect(buffer)
   } catch (e) {
     // #region agent log
-    agentLog('A', 'lib/pdf/reader.ts:122', 'extractPdfTextDirect failed; will fallback to child process', {
+    agentLog('A', 'lib/pdf/reader.ts:122', 'extractPdfTextDirect failed (no fallback)', {
       error: e instanceof Error ? e.message : String(e),
+      vercel: Boolean(process.env.VERCEL),
     })
     // #endregion
-
-    // On Vercel, the child-process extractor can fail because serverless bundles may not
-    // include node_modules in a way a separate process can resolve. Prefer failing fast
-    // with the real direct-extraction error so the UI shows the actual root cause.
-    if (process.env.VERCEL) {
-      throw e
-    }
-  }
-
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'pdf-splitter-'))
-  const pdfPath = path.join(tmpDir, 'input.pdf')
-  const scriptPath = path.join(process.cwd(), 'scripts', 'pdf-extract.mjs')
-
-  await fs.writeFile(pdfPath, buffer)
-
-  try {
-    // #region agent log
-    agentLog('B', 'lib/pdf/reader.ts:137', 'extractPdfText child-process start', {
-      node: process.version,
-      cwd: process.cwd(),
-      scriptPath,
-      scriptExists: await fs
-        .access(scriptPath)
-        .then(() => true)
-        .catch(() => false),
-    })
-    // #endregion
-
-    const out = await new Promise<string>((resolve, reject) => {
-      const child = spawn(process.execPath, [scriptPath, pdfPath], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-      })
-
-      let stdout = ''
-      let stderr = ''
-      child.stdout.on('data', (d) => {
-        stdout += String(d)
-      })
-      child.stderr.on('data', (d) => {
-        stderr += String(d)
-      })
-      child.on('error', reject)
-      child.on('close', (code) => {
-        if (code === 0) return resolve(stdout)
-        reject(new Error(stderr || stdout || 'PDF extraction failed'))
-      })
-    })
-
-    const parsed = JSON.parse(out) as ExtractorOutput
-    if (!parsed.ok) {
-      throw new Error(parsed.error || 'PDF extraction failed')
-    }
-
-    // #region agent log
-    agentLog('B', 'lib/pdf/reader.ts:175', 'extractPdfText child-process success', { textBytes: parsed.text.length })
-    // #endregion
-
-    return parsed.text
-  } finally {
-    // best-effort cleanup
-    await fs.rm(tmpDir, { recursive: true, force: true })
+    throw e
   }
 }
 
