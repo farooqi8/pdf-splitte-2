@@ -41,7 +41,7 @@ async function extractPdfTextDirect(buffer: Buffer): Promise<string> {
   // We point it at the bundled worker file.
   const { createRequire } = await import('node:module')
   const { pathToFileURL } = await import('node:url')
-  const require = createRequire(import.meta.url)
+  const require = createRequire(path.join(process.cwd(), 'package.json'))
   const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
   pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).toString()
 
@@ -112,6 +112,13 @@ async function extractPdfText(buffer: Buffer): Promise<string> {
       error: e instanceof Error ? e.message : String(e),
     })
     // #endregion
+
+    // On Vercel, the child-process extractor can fail because serverless bundles may not
+    // include node_modules in a way a separate process can resolve. Prefer failing fast
+    // with the real direct-extraction error so the UI shows the actual root cause.
+    if (process.env.VERCEL) {
+      throw e
+    }
   }
 
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'pdf-splitter-'))
