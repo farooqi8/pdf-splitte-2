@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createSupabaseAdminClient } from '@/lib/supabase/server'
 import type { ProcessingJob } from '@/types'
+import { RegeneratePdfsButton } from './RegeneratePdfsButton'
 
 function formatMoney(n: number): string {
   return new Intl.NumberFormat('en-US', {
@@ -39,8 +40,8 @@ export default async function ResultsPage({
   if (job.status === 'error') {
     return (
       <div className="space-y-6">
-        <div className="rounded-xl border border-red-200 bg-red-50 p-5">
-          <h1 className="text-xl font-bold text-red-900">Verification failed</h1>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 sm:p-5">
+          <h1 className="text-lg font-bold text-red-900 sm:text-xl">Verification failed</h1>
           <p className="mt-2 text-sm text-red-900">
             {job.error_message ?? 'Totals verification failed.'}
           </p>
@@ -55,7 +56,7 @@ export default async function ResultsPage({
   if (job.status !== 'complete') {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Results</h1>
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Results</h1>
         <p className="text-sm text-zinc-700">
           This job is still processing. Refresh in a few seconds.
         </p>
@@ -68,8 +69,8 @@ export default async function ResultsPage({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-        <h1 className="text-xl font-bold text-emerald-900">
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5">
+        <h1 className="text-lg font-bold leading-snug text-emerald-900 sm:text-xl">
           Totals verified — all groups match input PDF
         </h1>
         <p className="mt-2 text-sm text-emerald-900">
@@ -77,10 +78,10 @@ export default async function ResultsPage({
         </p>
       </div>
 
-      <section className="rounded-xl border bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm sm:p-5">
         <h2 className="text-sm font-semibold text-zinc-900">Summary</h2>
-        <div className="mt-3 overflow-x-auto rounded-lg border">
-          <table className="min-w-full text-left text-sm">
+        <div className="mt-3 -mx-1 overflow-x-auto overscroll-x-contain rounded-lg border border-zinc-200 sm:mx-0">
+          <table className="min-w-[28rem] w-full text-left text-sm sm:min-w-0">
             <thead className="bg-zinc-50 text-zinc-700">
               <tr>
                 <th className="px-4 py-3">Group</th>
@@ -122,21 +123,23 @@ export default async function ResultsPage({
         </p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <RegeneratePdfsButton jobId={job.id} />
+
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <a
-          className="inline-flex items-center justify-center rounded-md bg-zinc-900 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-zinc-800"
           href={`/api/download-pdf/${job.id}/saad`}
         >
           Download Saad PDF
         </a>
         <a
-          className="inline-flex items-center justify-center rounded-md bg-zinc-900 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-zinc-800"
           href={`/api/download-pdf/${job.id}/gorman`}
         >
           Download Gorman PDF
         </a>
         <a
-          className="inline-flex items-center justify-center rounded-md bg-zinc-900 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-zinc-900 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-zinc-800"
           href={`/api/download-pdf/${job.id}/extra`}
         >
           Download Extra PDF

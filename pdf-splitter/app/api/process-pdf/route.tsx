@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import { renderToBuffer } from '@react-pdf/renderer'
 
 import type { Group, Owner, ParsedRow, PermitMap, ReferenceRow } from '@/types'
@@ -7,11 +7,13 @@ import { readPdf } from '@/lib/pdf/reader'
 import { matchingEngine } from '@/lib/matching/engine'
 import { verifyTotals } from '@/lib/matching/verifier'
 import { requiredServiceRoleKey } from '@/lib/supabase/server'
+import { ensureJobsBucket, uploadJobPdfToStorage } from '@/lib/jobs/job-pdf-storage'
 import { SaadPdf } from '@/lib/pdf-generator/saad'
 import { GormanPdf } from '@/lib/pdf-generator/gorman'
 import { ExtraPdf } from '@/lib/pdf-generator/extra'
 
 export const runtime = 'nodejs'
+export const maxDuration = 120
 
 function requiredEnv(name: string): string {
   const value = process.env[name]
@@ -31,45 +33,6 @@ function toPermitMap(rows: ReferenceRow[]): PermitMap {
   const map: PermitMap = new Map()
   for (const r of rows) map.set(r.permit_number, r)
   return map
-}
-
-async function ensureJobsBucket(supabase: SupabaseClient) {
-  const { data: buckets, error } = await supabase.storage.listBuckets()
-  if (error) throw new Error('Failed to access Supabase Storage buckets.')
-  const exists = buckets.some((b) => b.name === 'jobs')
-  if (exists) return
-
-  const { error: createError } = await supabase.storage.createBucket('jobs', {
-    public: false,
-  })
-  if (createError) {
-    throw new Error(
-      'Storage bucket "jobs" is missing. Create it in Supabase Storage and try again.',
-    )
-  }
-}
-
-async function uploadPdfAndStorePath(params: {
-  supabase: SupabaseClient
-  jobId: string
-  type: Group
-  buffer: Buffer
-}): Promise<string> {
-  const filename = `${params.type}.pdf`
-  const objectPath = `${params.jobId}/${filename}`
-
-  const { error } = await params.supabase.storage
-    .from('jobs')
-    .upload(objectPath, params.buffer, {
-      contentType: 'application/pdf',
-      upsert: true,
-    })
-
-  if (error) {
-    throw new Error(`Failed to upload ${params.type.toUpperCase()} PDF to storage.`)
-  }
-
-  return objectPath
 }
 
 function assignGroup(
@@ -203,7 +166,6 @@ export async function POST(req: Request) {
         reportDate={reportDate}
         generatedAt={generatedAt}
         rows={matchResult.saad}
-        saadMap={saadMap}
       />,
     )
 
@@ -213,7 +175,6 @@ export async function POST(req: Request) {
         reportDate={reportDate}
         generatedAt={generatedAt}
         rows={matchResult.gorman}
-        gormanMap={gormanMap}
       />,
     )
 
@@ -229,14 +190,14 @@ export async function POST(req: Request) {
     // 8) Upload PDFs to Supabase Storage
     await ensureJobsBucket(supabase)
     const [saadPath, gormanPath, extraPath] = await Promise.all([
-      uploadPdfAndStorePath({ supabase, jobId, type: 'saad', buffer: saadPdf }),
-      uploadPdfAndStorePath({
+      uploadJobPdfToStorage({ supabase, jobId, type: 'saad', buffer: saadPdf }),
+      uploadJobPdfToStorage({
         supabase,
         jobId,
         type: 'gorman',
         buffer: gormanPdf,
       }),
-      uploadPdfAndStorePath({ supabase, jobId, type: 'extra', buffer: extraPdf }),
+      uploadJobPdfToStorage({ supabase, jobId, type: 'extra', buffer: extraPdf }),
     ])
 
     // 9) Update job as complete

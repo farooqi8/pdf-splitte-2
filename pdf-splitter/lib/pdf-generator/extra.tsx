@@ -49,8 +49,6 @@ export function ExtraPdf({
               cells={{
                 row: String(r.row_index),
                 permit: r.raw_permit,
-                plate: '',
-                owner: '',
                 responses: formatMoney(r.responses),
                 price: formatMoney(r.price),
               }}

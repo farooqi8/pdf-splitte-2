@@ -1,5 +1,5 @@
 import { Document } from '@react-pdf/renderer'
-import type { ParsedRow, PermitMap } from '@/types'
+import type { ParsedRow } from '@/types'
 import {
   PdfFooter,
   PdfGrandTotal,
@@ -11,22 +11,16 @@ import {
   formatMoney,
 } from '@/lib/pdf-generator/shared'
 
-function safeString(v: string | null | undefined): string {
-  return v ? String(v) : ''
-}
-
 export function SaadPdf({
   jobId,
   reportDate,
   generatedAt,
   rows,
-  saadMap,
 }: {
   jobId: string
   reportDate: string
   generatedAt: string
   rows: ParsedRow[]
-  saadMap: PermitMap
 }) {
   const totals = rows.reduce(
     (acc, r) => {
@@ -48,26 +42,18 @@ export function SaadPdf({
         />
 
         <PdfTable>
-          {rows.map((r, idx) => {
-            const ref = saadMap.get(r.permit_number)
-            const ownerName = safeString(ref?.owner_name)
-            const plate = safeString(ref?.plate_number)
-
-            return (
-              <PdfTableRow
-                key={`${r.permit_number}-${r.row_index}`}
-                zebra={idx % 2 === 0}
-                cells={{
-                  row: String(r.row_index),
-                  permit: r.raw_permit,
-                  plate,
-                  owner: ownerName,
-                  responses: formatMoney(r.responses),
-                  price: formatMoney(r.price),
-                }}
-              />
-            )
-          })}
+          {rows.map((r, idx) => (
+            <PdfTableRow
+              key={`${r.permit_number}-${r.row_index}`}
+              zebra={idx % 2 === 0}
+              cells={{
+                row: String(r.row_index),
+                permit: r.raw_permit,
+                responses: formatMoney(r.responses),
+                price: formatMoney(r.price),
+              }}
+            />
+          ))}
         </PdfTable>
 
         <PdfTotalsRow

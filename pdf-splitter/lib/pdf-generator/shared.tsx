@@ -1,10 +1,4 @@
-import {
-  Font,
-  Page,
-  StyleSheet,
-  Text,
-  View,
-} from '@react-pdf/renderer'
+import { Page, StyleSheet, Text, View } from '@react-pdf/renderer'
 import type { ReactNode } from 'react'
 
 export const COLORS = {
@@ -16,6 +10,9 @@ export const COLORS = {
 } as const
 
 export const STATION_NAME = 'Killo 14 Station' as const
+
+/** Bumped when report table layout changes; must appear in footer of generated PDFs. */
+export const PDF_LAYOUT_MARK = 'v2-4col'
 
 // Use built-in PDF fonts (Helvetica is available by default); no registration needed.
 
@@ -171,13 +168,15 @@ export function PdfFooter({ generatedAt }: { generatedAt: string }) {
           `Page ${pageNumber} of ${totalPages}`
         }
       />
-      <Text>Generated: {generatedAt}</Text>
+      <Text>
+        Generated: {generatedAt} · {PDF_LAYOUT_MARK}
+      </Text>
     </View>
   )
 }
 
 export type TableColumn = {
-  key: 'row' | 'permit' | 'plate' | 'owner' | 'responses' | 'price'
+  key: 'row' | 'permit' | 'responses' | 'price'
   label: string
   // percentage width (sum to ~100)
   widthPct: number
@@ -185,12 +184,10 @@ export type TableColumn = {
 }
 
 export const DEFAULT_COLUMNS: TableColumn[] = [
-  { key: 'row', label: 'Row#', widthPct: 6, align: 'center' },
-  { key: 'permit', label: 'Permit Number', widthPct: 18, align: 'left' },
-  { key: 'plate', label: 'Plate', widthPct: 16, align: 'left' },
-  { key: 'owner', label: 'Owner Name', widthPct: 30, align: 'left' },
-  { key: 'responses', label: 'Responses', widthPct: 12, align: 'right' },
-  { key: 'price', label: 'Price', widthPct: 18, align: 'right' },
+  { key: 'row', label: 'Row#', widthPct: 8, align: 'center' },
+  { key: 'permit', label: 'Permit Number', widthPct: 34, align: 'left' },
+  { key: 'responses', label: 'Responses', widthPct: 20, align: 'right' },
+  { key: 'price', label: 'Price', widthPct: 38, align: 'right' },
 ] as const
 
 function alignToJustify(

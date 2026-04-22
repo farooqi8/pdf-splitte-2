@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { readPdf } from '@/lib/pdf/reader'
 
 export const runtime = 'nodejs'
+/** Large station PDFs can take a long time to parse. */
+export const maxDuration = 120
 
 export async function GET() {
   return NextResponse.json({

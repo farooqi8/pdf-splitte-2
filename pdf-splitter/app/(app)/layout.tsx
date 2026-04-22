@@ -12,22 +12,31 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-900">
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <Link href="/" className="text-lg font-semibold tracking-tight">
+      <header className="sticky top-0 z-10 border-b bg-white/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-white/80">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4">
+          <Link
+            href="/"
+            className="text-base font-semibold tracking-tight text-zinc-900 sm:text-lg"
+          >
             PDF Splitter
           </Link>
-          <nav className="flex items-center gap-4 text-sm font-medium text-zinc-700">
-            <Link href="/references" className="hover:text-zinc-950">
+          <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <Link
+              href="/references"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950"
+            >
               References
             </Link>
-            <Link href="/process" className="hover:text-zinc-950">
+            <Link
+              href="/process"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950"
+            >
               Process
             </Link>
           </nav>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
     </div>
   )
 }

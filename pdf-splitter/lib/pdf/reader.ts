@@ -1,6 +1,5 @@
 import type { ParsedRow, RawTotals } from '@/types'
 import { normalisePermit } from '@/lib/matching/normalise'
-import path from 'node:path'
 
 // #region agent log
 function agentLog(hypothesisId: string, location: string, message: string, data: Record<string, unknown>) {
@@ -80,9 +79,12 @@ async function extractPdfTextDirect(buffer: Buffer): Promise<string> {
       // #endregion
     }
 
-    // Importing here ensures Next/Vercel bundles pdfjs-dist into the server function.
+    // Load pdfjs without webpack re-bundling (avoids "Object.defineProperty called on non-object").
     stage = 'pdfjs_import'
-    const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+    const pdfjs = await import(
+      /* webpackIgnore: true */
+      'pdfjs-dist/legacy/build/pdf.mjs',
+    )
 
     stage = 'getDocument'
     // In Vercel/serverless, worker resolution can break unless we explicitly bundle it.
@@ -91,8 +93,10 @@ async function extractPdfTextDirect(buffer: Buffer): Promise<string> {
       const { createRequire } = await import('node:module')
       const { pathToFileURL } = await import('node:url')
 
-      // Force worker to be included in the server bundle.
-      await import('pdfjs-dist/legacy/build/pdf.worker.mjs')
+      await import(
+        /* webpackIgnore: true */
+        'pdfjs-dist/legacy/build/pdf.worker.mjs',
+      )
 
       const requireA = createRequire(import.meta.url)
       const workerPath = requireA.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
